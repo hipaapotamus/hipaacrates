@@ -9,6 +9,9 @@ name = "pypi"
 
 typing = "*"
 typing-extensions = "*"
+pyyaml = "*"
+click = "*"
+filelock = "*"
 
 
 [dev-packages]

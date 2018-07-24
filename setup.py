@@ -57,6 +57,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
+            "crater = hipaacrates.__main__:crater"
         ],
     },
     classifiers=[
