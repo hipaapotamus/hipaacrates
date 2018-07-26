@@ -62,3 +62,7 @@ def test_make_service_definition(crate_obj):
     assert definition == "COPY .hipaacrates/{}.sh /etc/service/{}/run\nRUN chmod a+x /etc/service/{}/run".format(
         crate_obj.name, crate_obj.name, crate_obj.name,
     )
+
+def test_make_service_definition_no_run_command(crate_obj):
+    crate_obj.run_command = ""
+    assert dockerfile.make_service_definition(crate_obj) == ""

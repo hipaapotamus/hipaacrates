@@ -57,9 +57,12 @@ def make_copy_statement(src: str, dest: str) -> str:
     return "COPY {} {}".format(src, dest)
 
 def make_service_definition(crate: Crate) -> str:
-    string = StringIO()
-    string.write("COPY .hipaacrates/{}.sh /etc/service/{}/run\n".format(
-        crate.name, crate.name,
-    ))
-    string.write("RUN chmod a+x /etc/service/{}/run".format(crate.name))
-    return string.getvalue()
+    if crate.run_command:
+        string = StringIO()
+        string.write("COPY .hipaacrates/{}.sh /etc/service/{}/run\n".format(
+            crate.name, crate.name,
+        ))
+        string.write("RUN chmod a+x /etc/service/{}/run".format(crate.name))
+        return string.getvalue()
+    else:
+        return ""
