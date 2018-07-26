@@ -246,3 +246,7 @@ $RECYCLE.BIN/
 
 
 # End of https://www.gitignore.io/api/vim,linux,macos,emacs,python,windows,visualstudiocode
+
+### Hipaacrates ###
+.hipaacrates/
+Hipaacrate

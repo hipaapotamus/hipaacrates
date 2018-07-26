@@ -6,6 +6,8 @@ import click
 from filelock import FileLock, Timeout
 
 from . import crate
+from . import dockerfile
+from . import services
 from . import version
 
 def _get_lock_file_name() -> str:
@@ -24,6 +26,23 @@ LOCK_FILE = FileLock(_get_lock_file_name(), timeout=0.1)
 @click.version_option(version.__version__, prog_name="crater")
 def crater():
     pass
+
+@crater.command()
+@click.pass_context
+def build(ctx):
+    try:
+        LOCK_FILE.acquire()
+        c = crate.read_yaml(CRATE_FILE)
+    except FileNotFoundError:
+        ctx.fail("Could not open the Hipaacrate file - have you run 'crater init'?")
+    except Timeout:
+        ctx.fail("The Hipaacrate file is currently locked - a separate process must be using it")
+    else:
+        scripts = services.make_scripts(c)
+        services.to_file(scripts)
+        dockerfile.make_file(c)
+
+        LOCK_FILE.release()
 
 @crater.command()
 @click.argument("bundles", nargs=-1, metavar="BUNDLE [BUNDLE]...")
