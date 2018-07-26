@@ -30,6 +30,9 @@ def test_make_run_statement(crate_obj):
         statement = dockerfile.make_run_statement(step)
         assert statement == "RUN {}".format(step)
 
+def test_make_run_statement_empty_string():
+    assert dockerfile.make_run_statement("") == ""
+
 def test_convert_build_steps(crate_obj):
     steps = dockerfile.convert_build_steps(crate_obj)
     assert steps == "RUN {}\nRUN {}".format(
@@ -49,8 +52,13 @@ def test_include_files(crate_obj):
         crate_obj.includes[0], crate_obj.includes[1], dest,
     )
 
+def test_empty_includes(crate_obj):
+    crate_obj.includes = []
+    statement = dockerfile.include_files(crate_obj)
+    assert statement == ""
+
 def test_make_service_definition(crate_obj):
     definition = dockerfile.make_service_definition(crate_obj)
-    assert definition == "COPY .hipaacrates/{}.sh /etc/services/{}/run\nRUN chmod a+x /etc/services/{}/run".format(
+    assert definition == "COPY .hipaacrates/{}.sh /etc/service/{}/run\nRUN chmod a+x /etc/service/{}/run".format(
         crate_obj.name, crate_obj.name, crate_obj.name,
     )

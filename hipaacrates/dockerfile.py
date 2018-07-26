@@ -5,6 +5,11 @@ from .crate import Crate
 DEFAULT_BASE_IMAGE = "phusion/baseimage:0.10.1"
 WORKDIR_PREFIX = "/opt/services"
 
+def make_file(crate: Crate) -> None:
+    content = make(crate)
+    with open("Dockerfile", "w") as f:
+        f.write(content + "\n")
+
 def make(crate: Crate) -> str:
     string = StringIO()
     string.write(
@@ -39,19 +44,22 @@ def convert_build_steps(crate: Crate) -> str:
     return "\n".join(steps)
 
 def make_run_statement(cmd: str) -> str:
-    return "RUN {}".format(cmd)
+    return "RUN {}".format(cmd) if cmd else ""
 
 def include_files(crate: Crate) -> str:
-    all_files = " ".join(crate.includes)
-    return "COPY {} {}/{}/".format(all_files, WORKDIR_PREFIX, crate.name)
+    if crate.includes:
+        all_files = " ".join(crate.includes)
+        return "COPY {} {}/{}/".format(all_files, WORKDIR_PREFIX, crate.name)
+    else:
+        return ""
 
 def make_copy_statement(src: str, dest: str) -> str:
     return "COPY {} {}".format(src, dest)
 
 def make_service_definition(crate: Crate) -> str:
     string = StringIO()
-    string.write("COPY .hipaacrates/{}.sh /etc/services/{}/run\n".format(
+    string.write("COPY .hipaacrates/{}.sh /etc/service/{}/run\n".format(
         crate.name, crate.name,
     ))
-    string.write("RUN chmod a+x /etc/services/{}/run".format(crate.name))
+    string.write("RUN chmod a+x /etc/service/{}/run".format(crate.name))
     return string.getvalue()
