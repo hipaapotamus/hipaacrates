@@ -40,7 +40,7 @@ def make_header(crate: Crate, baseimage: str = None) -> str:
     return string.getvalue()
 
 def convert_build_steps(crate: Crate) -> str:
-    steps = [make_run_statement(step) for step in crate.build_steps]
+    steps = [make_run_statement(step) for step in crate.build_steps if step]
     return "\n".join(steps)
 
 def make_run_statement(cmd: str) -> str:

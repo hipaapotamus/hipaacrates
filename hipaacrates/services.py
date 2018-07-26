@@ -7,8 +7,11 @@ from .crate import Crate
 HIPAACRATES_WORK_DIR = ".hipaacrates"
 
 def make_scripts(crate: Crate) -> Dict[str, str]:
-    core_script = "#!/bin/sh\n\n{}".format(crate.run_command)
-    return {crate.name: core_script}
+    if crate.run_command:
+        core_script = "#!/bin/sh\n\n{}".format(crate.run_command)
+        return {crate.name: core_script}
+    else:
+        return {}
 
 def to_file(scripts: Dict[str, str]) -> None:
     os.makedirs(HIPAACRATES_WORK_DIR, mode=0o775, exist_ok=True)
