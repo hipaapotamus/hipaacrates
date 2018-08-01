@@ -1,6 +1,6 @@
 import pytest
 
-from hipaacrates import crate, dockerfile
+from hipaacrates import bundles, crate, dockerfile
 
 @pytest.fixture
 def crate_obj():
@@ -12,18 +12,38 @@ def crate_obj():
             "make",
             "make install",
         ],
-        bundles=["python"],
+        bundles=["foo"],
         includes=["myapp/", "tests/"],
         run_command="/bin/sh",
     )
+ 
+class MockBundleLoader(bundles.BundleLoader):
+    def load(self, name):
+        return crate.new(
+            name,
+            "0.0.1",
+            build_steps=[
+                "bar",
+                "baz",
+            ],
+            includes=["foobar.txt"],
+            run_command="/bin/sh",
+        )
 
 def test_make_dockerfile_header(crate_obj):
     header = dockerfile.make_header(crate_obj)
 
-    assert header == "FROM {}\nLABEL maintainer \"{}\"\nLABEL version \"{}\"\nWORKDIR {}".format(
-        dockerfile.DEFAULT_BASE_IMAGE, crate_obj.author,
-        crate_obj.version, "/opt/services/{}".format(crate_obj.name)
+    assert header == "FROM {}\nLABEL maintainer \"{}\"\nLABEL version \"{}\"".format(
+        dockerfile.DEFAULT_BASE_IMAGE, crate_obj.author, crate_obj.version,
     )
+
+def test_change_workdir(crate_obj):
+    workdir_statement = dockerfile.change_workdir(crate_obj)
+    assert workdir_statement == "WORKDIR {}/{}".format(dockerfile.WORKDIR_PREFIX, crate_obj.name)
+
+    prefix = "/opt/test/"
+    workdir_statement = dockerfile.change_workdir(crate_obj, prefix)
+    assert workdir_statement == "WORKDIR {}/{}".format(prefix[:-1], crate_obj.name)
 
 def test_make_run_statement(crate_obj):
     for step in crate_obj.build_steps:
@@ -66,3 +86,27 @@ def test_make_service_definition(crate_obj):
 def test_make_service_definition_no_run_command(crate_obj):
     crate_obj.run_command = ""
     assert dockerfile.make_service_definition(crate_obj) == ""
+
+def test_make(crate_obj):
+    expected = """FROM {}
+LABEL maintainer "{}"
+LABEL version "{v}"
+# Hipaacrate bundle foo, version 0.0.1
+WORKDIR {wp}/foo
+COPY foobar.txt {wp}/foo/
+RUN bar
+RUN baz
+COPY .hipaacrates/foo.sh /etc/service/foo/run
+RUN chmod a+x /etc/service/foo/run
+# Hipaacrate bundle {name}, version {v}
+WORKDIR {wp}/{name}
+COPY myapp/ tests/ {wp}/{name}/
+RUN make
+RUN make install
+COPY .hipaacrates/{name}.sh /etc/service/{name}/run
+RUN chmod a+x /etc/service/{name}/run
+""".format(dockerfile.DEFAULT_BASE_IMAGE, crate_obj.author, name=crate_obj.name,
+           v=crate_obj.version, wp=dockerfile.WORKDIR_PREFIX)
+
+    df = dockerfile.make(crate_obj, MockBundleLoader())
+    assert df == expected

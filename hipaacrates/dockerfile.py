@@ -1,29 +1,29 @@
 from io import StringIO
 
+from .bundles import BundleLoader, load_dependencies, resolve_dependencies
 from .crate import Crate
 
 DEFAULT_BASE_IMAGE = "phusion/baseimage:0.10.1"
 WORKDIR_PREFIX = "/opt/services"
 
-def make_file(crate: Crate) -> None:
-    content = make(crate)
+def make_file(crate: Crate, bundle_loader: BundleLoader) -> None:
+    content = make(crate, bundle_loader)
     with open("Dockerfile", "w") as f:
         f.write(content + "\n")
 
-def make(crate: Crate) -> str:
+def make(crate: Crate, bundle_loader: BundleLoader) -> str:
+    deps = load_dependencies(crate, bundle_loader)
+    deps.append(crate) # add starting crate to ensure no circular dependencies when we resolve
+    crates = resolve_dependencies(deps)
+
     string = StringIO()
-    string.write(
-        make_header(crate) + "\n"
-    )
-    string.write(
-        convert_build_steps(crate) + "\n"
-    )
-    string.write(
-        include_files(crate) + "\n"
-    )
-    string.write(
-        make_service_definition(crate) + "\n"
-    )
+    string.write(make_header(crate) + "\n")
+    for c in crates:
+        string.write("# Hipaacrate bundle {}, version {}\n".format(c.name, c.version))
+        string.write(change_workdir(c) + "\n")
+        string.write(include_files(c) + "\n")
+        string.write(convert_build_steps(c) + "\n")
+        string.write(make_service_definition(c) + "\n")
     return string.getvalue()
 
 def make_header(crate: Crate, baseimage: str = None) -> str:
@@ -34,10 +34,17 @@ def make_header(crate: Crate, baseimage: str = None) -> str:
     string.write("FROM {}\n".format(baseimage))
     if crate.author:
         string.write("LABEL maintainer \"{}\"\n".format(crate.author))
-    string.write("LABEL version \"{}\"\n".format(crate.version))
-    string.write("WORKDIR {}/{}".format(WORKDIR_PREFIX, crate.name))
+    string.write("LABEL version \"{}\"".format(crate.version))
 
     return string.getvalue()
+
+def change_workdir(crate: Crate, prefix: str = None) -> str:
+    if prefix is None:
+        prefix = WORKDIR_PREFIX
+    else:
+        if prefix.endswith("/"):
+            prefix = prefix[:-1]
+    return "WORKDIR {}/{}".format(prefix, crate.name)
 
 def convert_build_steps(crate: Crate) -> str:
     steps = [make_run_statement(step) for step in crate.build_steps if step]
