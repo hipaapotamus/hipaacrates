@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 import yaml
 
@@ -173,3 +175,17 @@ def test_read_yaml(tmpdir, cratetext):
     assert c.bundles == ["mybundle", "foobundle"]
     assert c.includes == ["src/", "tests/"]
     assert c.run_command == "/bin/sh"
+
+def test_crate_equality():
+    crate1 = crate.new(
+        "mycrate",
+        "0.0.1",
+        author="me",
+        build_steps=["this", "is", "a", "test"],
+        bundles=["foo", "bar", "baz"],
+        includes=["myfile"],
+        run_command="gogogo"
+    )
+    crate2 = deepcopy(crate1)
+
+    assert crate1 == crate2

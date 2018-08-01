@@ -13,6 +13,19 @@ class Crate(object):
         self.run_command = run_command
         self.version = version
 
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Crate):
+            return (
+                self.author == other.author and
+                self.build_steps == other.build_steps and
+                self.bundles == other.bundles and
+                self.includes == other.includes and
+                self.name == other.name and
+                self.run_command == other.run_command and
+                self.version == other.version
+            )
+        return NotImplemented
+
     def __str__(self) -> str:
         return "Crate(name={}, version={}, author={}, bundles={}".format(
             self.name, self.version, self.author, self.bundles,
