@@ -1,0 +1,11 @@
+name: foo
+version: 0.0.1
+author: me
+includes:
+  - myapp/
+build_steps:
+  - make
+  - make install
+bundles:
+  - bar
+  - baz
