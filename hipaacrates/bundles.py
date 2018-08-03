@@ -4,14 +4,14 @@ import os
 
 import requests
 from typing import Dict, Iterable, List
+from typing_extensions import Protocol
 
 from . import crate
 
 HIPAACRATE_BUNDLES_ENDPOINT = "/bundles"
 HIPAACRATE_BUNDLES_PREFIX = "hipaacrate_bundles"
 
-class BundleLoader(ABC):
-    @abstractmethod
+class BundleLoader(Protocol):
     def load(self, name: str) -> crate.Crate:
         ...
 
@@ -46,16 +46,9 @@ def load_dependencies(origin: crate.Crate, loader: BundleLoader) -> List[crate.C
             crates[td.name] = td
     return list(crates.values())
 
-
-class FSBundleLoader(BundleLoader):
-    def __init__(self, directory: str = HIPAACRATE_BUNDLES_PREFIX) -> None:
-        self.directory = directory
-    
-    def load(self, name: str) -> crate.Crate:
-        return crate.read_yaml(os.path.join(self.directory, name))
-
-class HTTPBundleLoader(BundleLoader):
-    def __init__(self, host: str, endpoint: str = HIPAACRATE_BUNDLES_ENDPOINT) -> None:
+class BundleRepository(object):
+    def __init__(self, host: str, endpoint: str = HIPAACRATE_BUNDLES_ENDPOINT,
+                 cache_dir: str = HIPAACRATE_BUNDLES_PREFIX) -> None:
         if host.endswith("/"):
             host = host[:-1]
         if endpoint.endswith("/"):
@@ -63,53 +56,44 @@ class HTTPBundleLoader(BundleLoader):
         if not endpoint.startswith("/"):
             endpoint = "/{}".format(endpoint)
         
-        self.host = host
-        self.endpoint = endpoint
-    
-    def load(self, name: str) -> crate.Crate:
-        r = requests.get("{}{}/{}".format(self.host, self.endpoint, name))
-        r.raise_for_status()
-        return crate.parse(r.text)
-
-class CachingBundleLoader(BundleLoader):
-    def __init__(self, host: str, endpoint: str = HIPAACRATE_BUNDLES_ENDPOINT,
-                 cache_dir: str = HIPAACRATE_BUNDLES_PREFIX) -> None:
-        self._http_loader = HTTPBundleLoader(host, endpoint)
-        self._fs_loader = FSBundleLoader(cache_dir)
+        self._host = host
+        self._endpoint = endpoint
+        self.cache_dir = cache_dir
     
     @property
     def host(self) -> str:
-        return self._http_loader.host
+        return self._host
     
     @host.setter
     def host(self, value: str) -> None:
-        self._http_loader.host = value
+        if value.endswith("/"):
+            value = value[:-1]
+        self._host = value
     
     @property
     def endpoint(self) -> str:
-        return self._http_loader.endpoint
+        return self._endpoint
     
     @endpoint.setter
     def endpoint(self, value: str) -> None:
-        self._http_loader.endpoint = value
+        if value.endswith("/"):
+            value = value[:-1]
+        if not value.startswith("/"):
+            value = "/{}".format(value)
+        self._endpoint = value
     
-    @property
-    def cache_dir(self) -> str:
-        return self._fs_loader.directory
-    
-    @cache_dir.setter
-    def cache_dir(self, value: str) -> None:
-        self._fs_loader.directory = value
+    def download(self, name: str, save_to_disk: bool = False) -> crate.Crate:
+        r = requests.get("{}{}/{}".format(self.host, self.endpoint, name))
+        r.raise_for_status()
+        c = crate.parse(r.text)
+        if save_to_disk:
+            os.makedirs(self.cache_dir, mode=0o755, exist_ok=True)
+            c.to_yaml(os.path.join(self.cache_dir, c.name))
+        
+        return c
     
     def load(self, name: str) -> crate.Crate:
-        try:
-            c = self._fs_loader.load(name)
-        except FileNotFoundError:
-            pass
-        else:
-            return c
-        
-        c = self._http_loader.load(name)
-        c.to_yaml(os.path.join(self.cache_dir, c.name))
-
-        return c
+        return crate.read_yaml(os.path.join(self.cache_dir, name))
+    
+    def remove(self, name: str) -> None:
+        os.remove(os.path.join(self.cache_dir, name))
