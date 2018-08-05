@@ -16,7 +16,7 @@ def crate_obj():
         includes=["myapp/", "tests/"],
         run_command="/bin/sh",
     )
- 
+
 class MockBundleLoader(bundles.BundleLoader):
     def load(self, name):
         return crate.new(
@@ -108,5 +108,8 @@ RUN chmod a+x /etc/service/{name}/run
 """.format(dockerfile.DEFAULT_BASE_IMAGE, crate_obj.author, name=crate_obj.name,
            v=crate_obj.version, wp=dockerfile.WORKDIR_PREFIX)
 
-    df = dockerfile.make(crate_obj, MockBundleLoader())
+    loader = MockBundleLoader()
+    deps = [loader.load(b) for b in crate_obj.bundles]
+
+    df = dockerfile.make(crate_obj, deps)
     assert df == expected

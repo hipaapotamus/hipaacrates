@@ -76,9 +76,8 @@ def test_load_dependencies(crate_obj):
 def test_resolve_dependencies(crate_obj):
     loader = MockBundleLoader()
     deps = [loader.load(n) for n in ["foo", "bar", "baz"]]
-    deps.append(crate_obj)
 
-    resolved = bundles.resolve_dependencies(deps)
+    resolved = bundles.resolve_dependencies(crate_obj, deps)
     assert len(resolved) == 4
 
     assert resolved[0].name == "bar"
@@ -89,10 +88,9 @@ def test_resolve_dependencies(crate_obj):
 def test_resolve_dependencies_circular(crate_obj):
     loader = MockCircularBundleLoader()
     deps = [loader.load(n) for n in ["foo", "bar", "baz"]]
-    deps.append(crate_obj)
 
     with pytest.raises(ValueError):
-        bundles.resolve_dependencies(deps)
+        bundles.resolve_dependencies(crate_obj, deps)
 
 def test_bundle_repository_load():
     repo = bundles.BundleRepository(host="", cache_dir=CACHE_DIR)
