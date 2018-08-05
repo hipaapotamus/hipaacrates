@@ -1,20 +1,21 @@
 from io import StringIO
 
+from typing import Iterable
+
+from . import services
 from .bundles import BundleLoader, load_dependencies, resolve_dependencies
 from .crate import Crate
 
 DEFAULT_BASE_IMAGE = "phusion/baseimage:0.10.1"
 WORKDIR_PREFIX = "/opt/services"
 
-def make_file(crate: Crate, bundle_loader: BundleLoader) -> None:
-    content = make(crate, bundle_loader)
+def make_file(crate: Crate, dependencies: Iterable[Crate]) -> None:
+    content = make(crate, dependencies)
     with open("Dockerfile", "w") as f:
         f.write(content + "\n")
 
-def make(crate: Crate, bundle_loader: BundleLoader) -> str:
-    deps = load_dependencies(crate, bundle_loader)
-    deps.append(crate) # add starting crate to ensure no circular dependencies when we resolve
-    crates = resolve_dependencies(deps)
+def make(crate: Crate, dependencies: Iterable[Crate]) -> str:
+    crates = resolve_dependencies(crate, dependencies)
 
     string = StringIO()
     string.write(make_header(crate) + "\n")

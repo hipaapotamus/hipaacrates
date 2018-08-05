@@ -9,13 +9,26 @@ from typing_extensions import Protocol
 from . import crate
 
 HIPAACRATE_BUNDLES_ENDPOINT = "/bundles"
-HIPAACRATE_BUNDLES_PREFIX = "hipaacrate_bundles"
+HIPAACRATE_BUNDLES_CACHE_DIR = "hipaacrate_bundles"
 
 class BundleLoader(Protocol):
     def load(self, name: str) -> crate.Crate:
         ...
 
-def resolve_dependencies(crates: Iterable[crate.Crate]) -> List[crate.Crate]:
+def load_dependencies(origin: crate.Crate, loader: BundleLoader) -> List[crate.Crate]:
+    crates: Dict[str, crate.Crate] = OrderedDict()
+    for dep in origin.bundles:
+        dep_info = dep.split(":")
+        c = loader.load(dep_info[0])
+        crates[c.name] = c
+        transitive_deps = load_dependencies(c, loader)
+        for td in transitive_deps:
+            crates[td.name] = td
+    return list(crates.values())
+
+def resolve_dependencies(origin: crate.Crate, dependencies: Iterable[crate.Crate]) -> List[crate.Crate]:
+    crates = list(dependencies) + [origin]
+
     resolved = []
     name_to_instance = dict((c.name, c) for c in crates)
     name_to_deps = dict((c.name, set([b.split(":")[0] for b in c.bundles])) for c in crates)
@@ -35,20 +48,9 @@ def resolve_dependencies(crates: Iterable[crate.Crate]) -> List[crate.Crate]:
     
     return resolved
 
-def load_dependencies(origin: crate.Crate, loader: BundleLoader) -> List[crate.Crate]:
-    crates: Dict[str, crate.Crate] = OrderedDict()
-    for dep in origin.bundles:
-        dep_info = dep.split(":")
-        c = loader.load(dep_info[0])
-        crates[c.name] = c
-        transitive_deps = load_dependencies(c, loader)
-        for td in transitive_deps:
-            crates[td.name] = td
-    return list(crates.values())
-
 class BundleRepository(object):
     def __init__(self, host: str, endpoint: str = HIPAACRATE_BUNDLES_ENDPOINT,
-                 cache_dir: str = HIPAACRATE_BUNDLES_PREFIX) -> None:
+                 cache_dir: str = HIPAACRATE_BUNDLES_CACHE_DIR) -> None:
         if host.endswith("/"):
             host = host[:-1]
         if endpoint.endswith("/"):

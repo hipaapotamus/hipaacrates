@@ -1,48 +1,25 @@
-import hashlib
-import os
-import tempfile
-
 import click
-from filelock import FileLock, Timeout
 
+from . import bundles
 from . import crate
 from . import dockerfile
+from . import hipaacrates
 from . import services
 from . import version
 
-def _get_lock_file_name() -> str:
-    return os.path.join(
-        tempfile.gettempdir(),
-        _hash_cwd(),
-    )
-
-def _hash_cwd() -> str:
-    return hashlib.sha256(os.getcwdb()).hexdigest()
-
-CRATE_FILE = "Hipaacrate"
-LOCK_FILE = FileLock(_get_lock_file_name(), timeout=0.1)
-
 @click.group()
+@click.option("--hipaacrates-file", envvar="HIPAACRATES_FILE", metavar="FILE", default=hipaacrates.HIPAACRATE_FILENAME)
+@click.option("--bundles-host", envvar="HIPAACRATES_BUNDLES_HOST", metavar="HOST", default="")
 @click.version_option(version.__version__, prog_name="crater")
-def crater():
-    pass
+@click.pass_context
+def crater(ctx, hipaacrates_file, bundles_host):
+    repo = bundles.BundleRepository(bundles_host)
+    ctx.obj = hipaacrates.Hipaacrates(repo, hipaacrates_file)
 
 @crater.command()
 @click.pass_context
 def build(ctx):
-    try:
-        LOCK_FILE.acquire()
-        c = crate.read_yaml(CRATE_FILE)
-    except FileNotFoundError:
-        ctx.fail("Could not open the Hipaacrate file - have you run 'crater init'?")
-    except Timeout:
-        ctx.fail("The Hipaacrate file is currently locked - a separate process must be using it")
-    else:
-        scripts = services.make_scripts(c)
-        services.to_file(scripts)
-        dockerfile.make_file(c)
-
-        LOCK_FILE.release()
+    ctx.obj.build_dockerfile()
 
 @crater.command()
 @click.argument("bundles", nargs=-1, metavar="BUNDLE [BUNDLE]...")
@@ -50,34 +27,31 @@ def build(ctx):
 def add(ctx, bundles):
     if not bundles:
         ctx.fail("Expected one or more Bundle name")
+    ctx.obj.add_bundles(*bundles)
 
-    try:
-        LOCK_FILE.acquire()
-        c = crate.read_yaml(CRATE_FILE)
-    except FileNotFoundError:
-        ctx.fail("Could not open the Hipaacrate file - have you run 'crater init'?")
-    except Timeout:
-        ctx.fail("The Hipaacrate file is currently locked - a separate process must be using it")
-    else:
-        combined = set(c.bundles) | set(bundles)
-        c.bundles = list(combined)
-        c.bundles.sort()
-        c.to_yaml(CRATE_FILE)
-        LOCK_FILE.release()
+@crater.command()
+@click.argument("files", nargs=-1, metavar="FILE [FILE]...")
+@click.pass_context
+def include(ctx, files):
+    if not files:
+        ctx.fail("Expected one or more files")
+    ctx.obj.include_files(*files)
+
 
 @crater.command()
 @click.option("-n", "--name", prompt=True, help="Crate name", metavar="NAME")
 @click.option("-v", "--version", prompt=True, help="Crate version", metavar="VERSION")
 @click.pass_context
 def init(ctx, name, version) -> None:
-    try:
-        LOCK_FILE.acquire()
-    except Timeout:
-        ctx.fail("The Hipaacrate file is currently locked - a separate process must be using it")
-    else:
-        c = crate.new(name, version)
-        c.to_yaml(CRATE_FILE)
-        LOCK_FILE.release()
+    ctx.obj.init_file(name, version)
+
+@crater.command()
+@click.argument("files", nargs=-1, metavar="FILE [FILE]...")
+@click.pass_context
+def omit(ctx, files):
+    if not files:
+        ctx.fail("Expected one or more files")
+    ctx.obj.omit_files(*files)
 
 @crater.command()
 @click.argument("bundles", nargs=-1, metavar="BUNDLE [BUNDLE]...")
@@ -85,39 +59,21 @@ def init(ctx, name, version) -> None:
 def remove(ctx, bundles):
     if not bundles:
         ctx.fail("Expected one or more Bundle name")
-
-    try:
-        LOCK_FILE.acquire()
-        c = crate.read_yaml(CRATE_FILE)
-    except FileNotFoundError:
-        ctx.fail("Could not open the Hipaacrate file - have you run 'crater init'?")
-    except Timeout:
-        ctx.fail("The Hipaacrate file is currently locked - a separate process must be using it")
-    else:
-        to_remove = set(bundles)
-        existing = set(c.bundles)
-        if not existing >= to_remove:
-            ctx.fail("No Bundles named {} added".format(", ".join(to_remove - existing)))
-        else:
-            c.bundles = list(existing - to_remove)
-            c.bundles.sort()
-            c.to_yaml(CRATE_FILE)
-            LOCK_FILE.release()
+    ctx.obj.remove_bundles(*bundles)
 
 @crater.command()
-@click.argument("value", type=click.Choice(["author", "bundles", "name", "version"]))
+@click.argument("value", type=click.Choice(["author", "build_steps", "bundles", "includes", "name", "run_command", "version"]))
 @click.pass_context
 def show(ctx, value) -> None:
-    try:
-        LOCK_FILE.acquire()
-        c = crate.read_yaml(CRATE_FILE)
-    except FileNotFoundError:
-        ctx.fail("Could not open the Hipaacrate file - have you run 'crater init'?")
-    except Timeout:
-        ctx.fail("The Hipaacrate file is currently locked - a separate process must be using it")
+    v = ctx.obj.get_value(value)
+    if isinstance(v, (list, tuple)):
+        v = ["- " + str(e) for e in v]
+        v = "\n".join(v)
+        click.echo("{}:\n{}".format(value, v))
     else:
-        click.echo(getattr(c, value))
-        LOCK_FILE.release()
+        click.echo("{}: {}".format(value, v))
 
 if __name__ == '__main__':
+    # arguments aren't needed due to Click.
+    # pylint: disable=E1120
     crater()

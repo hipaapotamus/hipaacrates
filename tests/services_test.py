@@ -18,7 +18,7 @@ def crate_obj():
     )
 
 def test_make_scripts(crate_obj):
-    scripts = services.make_scripts(crate_obj)
+    scripts = services.make_scripts([crate_obj])
 
     assert crate_obj.name in scripts
     assert scripts[crate_obj.name] == "#!/bin/sh\n\n{}".format(crate_obj.run_command)
@@ -26,5 +26,16 @@ def test_make_scripts(crate_obj):
 def test_make_scripts_empty_run_command(crate_obj):
     crate_obj.run_command = ""
     
-    scripts = services.make_scripts(crate_obj)
+    scripts = services.make_scripts([crate_obj])
     assert crate_obj.name not in scripts
+
+def test_make_script(crate_obj):
+    statement = services.make_script(crate_obj)
+    
+    assert statement == "#!/bin/sh\n\n{}".format(crate_obj.run_command)
+
+def test_make_script_empty_run_command(crate_obj):
+    crate_obj.run_command = ""
+    statement = services.make_script(crate_obj)
+    
+    assert statement == ""
