@@ -50,8 +50,10 @@ class Hipaacrates(object):
         # Load dependencies for the local Hipaacrate
         deps = bundles.load_dependencies(c, self.bundle_repo)
         # Make shell scripts for the necessary services
-        services.make_scripts(deps)
-        services.make_script(c)
+        scripts = services.make_scripts(deps)
+        cmd = services.make_script(c)
+        scripts[c.name] = cmd
+        services.to_file(scripts)
         # Finally, make the Dockerfile
         dockerfile.make_file(c, deps)
     
