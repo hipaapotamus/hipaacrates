@@ -98,10 +98,16 @@ class Hipaacrates(object):
             self._save_crate(c)
 
     @hipaacrate_guard
-    def get_value(self, name: str) -> Any:
+    def get_value(self, key: str) -> Any:
         c = self._get_crate()
-        return getattr(c, name)
-
+        return getattr(c, key)
+    
+    @hipaacrate_guard
+    def set_value(self, key: str, value: Any) -> Any:
+        c = self._get_crate()
+        prev = getattr(c, key)
+        setattr(c, key, value)
+        return prev
 
 class HipaacrateFileError(Exception):
     pass

@@ -62,16 +62,23 @@ def remove(ctx, bundles):
     ctx.obj.remove_bundles(*bundles)
 
 @crater.command()
-@click.argument("value", type=click.Choice(["author", "build_steps", "bundles", "includes", "name", "run_command", "version"]))
+@click.argument("key", type=click.Choice(["author", "name", "run_command", "version"]))
+@click.argument("value")
 @click.pass_context
-def show(ctx, value) -> None:
-    v = ctx.obj.get_value(value)
+def set(ctx, key, value):
+    ctx.obj.set_value(key, value)
+
+@crater.command()
+@click.argument("key", type=click.Choice(["author", "build_steps", "bundles", "includes", "name", "run_command", "version"]))
+@click.pass_context
+def show(ctx, key) -> None:
+    v = ctx.obj.get_value(key)
     if isinstance(v, (list, tuple)):
         v = ["- " + str(e) for e in v]
         v = "\n".join(v)
-        click.echo("{}:\n{}".format(value, v))
+        click.echo("{}:\n{}".format(key, v))
     else:
-        click.echo("{}: {}".format(value, v))
+        click.echo("{}: {}".format(key, v))
 
 if __name__ == '__main__':
     # arguments aren't needed due to Click.
